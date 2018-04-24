@@ -125,7 +125,7 @@ class BackyardFlyer(Drone):
         super().start()
 
         # Only required if they do threaded
-        # while self.in_mission:
+        # while self.in_missiosourn:
         #    pass
 
         self.stop_log()
