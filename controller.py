@@ -19,20 +19,32 @@ class NonlinearController(object):
 
     def __init__(self):
         """Initialize the controller object and control gains"""
-     
-        self.z_k_p = 1.0
-        self.z_k_d = 1.0
-        self.x_k_p = 1.0
-        self.x_k_d = 1.0
-        self.y_k_p = 1.0
-        self.y_k_d = 1.0
-        self.k_p_roll = 1.0
-        self.k_p_pitch = 1.0
-        self.k_p_yaw = 1.0
-        self.k_p_p = 1.0
-        self.k_p_q = 1.0
-        self.k_p_r = 1.0
-        
+        delta = 0.75
+        omega =  1.33
+        T = 1/omega
+
+        kp = (1/(T*T)) * (1 + 2 * delta)
+       # kp = 2 * zeta * omega
+   #     kd = omega*omega
+        ki = 1/(T * T * T)
+        kd = (1/(T)) * (1 + 2 * delta)
+
+        print("Kp", kp)
+        print("Ki", ki)
+        print("Kd", kd)
+        self.z_k_p = kp
+        self.z_k_d = kd
+        self.x_k_p = kp
+        self.x_k_d = kd
+        self.y_k_p = kp
+        self.y_k_d = kd
+        self.k_p_roll = 0.5
+        self.k_p_pitch = 0.5
+        self.k_p_yaw = 0.5
+        self.k_p_p = 5.0
+        self.k_p_q = 5.0
+        self.k_p_r = 5.0
+
         self.g = -GRAVITY
         self.m = DRONE_MASS_KG
 
@@ -99,19 +111,28 @@ class NonlinearController(object):
         Returns: desired vehicle 2D acceleration in the local frame [north, east]
         """
              
-        x_target, y_target = local_position_cmd
-        x_dot_target, y_dot_target = local_velocity_cmd
-        x_actual, y_actual = local_position
-        x_dot_actual, y_dot_actual = local_velocity
-        x_dot_dot_target, y_dot_dot_target = acceleration_ff
+        x_target = local_position_cmd[0]
+        y_target = local_position_cmd[1]
+        x_dot_target = local_velocity_cmd[0]
+        y_dot_target = local_velocity_cmd[1]
+        x_actual = local_position[0]
+        y_actual = local_position[1]
+        x_dot_actual = local_velocity[0]
+        y_dot_actual = local_velocity[1]
+        x_dot_dot_target = acceleration_ff[0]
+        y_dot_dot_target = acceleration_ff[1]
         
         x_commanded = self.x_k_p * (x_target - x_actual) + self.x_k_d * (x_dot_target - x_dot_actual) + x_dot_dot_target
-    #  b_x_c = x_commanded/c
+   
         y_commanded = self.y_k_p * (y_target - y_actual) + self.y_k_d * (y_dot_target - y_dot_actual) + y_dot_dot_target
-    #  b_y_c = y_commanded/c
+    
+        print("X_Commanded", x_commanded, "YCommanded", y_commanded)
+        a = np.array([x_commanded, y_commanded])
+        b = np.clip(a,-1,1)
+        print ("First", b[0], "Second", b[1])
+        return b
         
-        return np.array([x_commanded, y_commanded])
-        #return np.array([0.0, 0.0])
+      #  return np.array([0.0, 0.0])
     
     def altitude_control(self, altitude_cmd, vertical_velocity_cmd, altitude, vertical_velocity, attitude, acceleration_ff=0.0):
         """Generate vertical acceleration (thrust) command
@@ -138,10 +159,12 @@ class NonlinearController(object):
         u_bar_1 = self.z_k_p * (z_target - z_actual) + self.z_k_d * (z_dot_target - z_dot_actual) + z_dot_dot_target
         b = rot_mat[2,2]
         c = (u_bar_1 - self.g) / b**2
-        
-        return c
+        print("C", c)
+        a = np.clip(c, 0, 10)
+        print("NEWC", a)
+        return a
          
-    #   return 0.0
+     #   return 0.0
         
     
     def roll_pitch_controller(self, acceleration_cmd, attitude, thrust_cmd):
@@ -206,7 +229,7 @@ class NonlinearController(object):
         r_error = r_c - r_actual
         u_bar_r = self.k_p_r * r_error
     #    print(u_bar_p * MOI[0], u_bar_q * MOI[1], u_bar_r * MOI[2])
-    
+        print("u_bar_p", u_bar_p * MOI[0], "u_bar_q", u_bar_q * MOI[1], "u_bar_r", u_bar_r * MOI[2])
         return np.array([u_bar_p * MOI[0], u_bar_q * MOI[1], u_bar_r * MOI[2]])
 
   #      return np.array([0.0, 0.0, 0.0])
@@ -222,6 +245,7 @@ class NonlinearController(object):
         """
  
         r_c = self.k_p_yaw * (yaw_cmd - yaw)
+        print("R_C", r_c)
         return r_c
-      #  return 0.0
+     #   return 0.0
     
